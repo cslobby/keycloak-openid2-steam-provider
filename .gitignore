@@ -1,0 +1,12 @@
+# Maven
+target/
+pom.xml.bak
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.class
+
+# OS
+.DS_Store
