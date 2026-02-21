@@ -112,6 +112,7 @@ public class SteamIdentityProvider
     public Object callback(RealmModel realm,
                            UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                            EventBuilder event) {
+        LOG.debug("SteamIdentityProvider.callback() called — returning SteamEndpoint");
         return new SteamEndpoint(callback, realm, event, this);
     }
 
@@ -133,7 +134,7 @@ public class SteamIdentityProvider
      * {@code IdentityBrokerService} routes GET requests to
      * {@code /realms/{realm}/broker/steam/endpoint} here.
      */
-    protected static class SteamEndpoint {
+    public static class SteamEndpoint {
 
         private final UserAuthenticationIdentityProvider.AuthenticationCallback callback;
         private final RealmModel realm;
@@ -172,6 +173,9 @@ public class SteamIdentityProvider
                 @QueryParam("openid.assoc_handle")    String assocHandle,
                 @QueryParam("openid.signed")          String signed,
                 @QueryParam("openid.sig")             String sig) {
+
+            LOG.debugf("SteamEndpoint.authResponse() called: state=%s mode=%s claimedId=%s",
+                    state, mode, claimedId);
 
             // --- Guard: state must be present ----------------------------------
             if (state == null || state.isBlank()) {
