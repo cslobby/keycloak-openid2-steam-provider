@@ -89,7 +89,7 @@ public class SteamIdentityProvider
         // Using the realm's base URL satisfies this requirement.
         URI baseUri  = request.getUriInfo().getBaseUri();
         String realm = request.getRealm().getName();
-        String realmUrl = baseUri + "realms/" + realm;
+        String realmUrl = baseUri + "/realms/" + realm;
 
         String steamUrl = STEAM_OPENID_URL
                 + "?openid.ns="         + penc(OPENID_NS)
