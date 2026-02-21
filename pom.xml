@@ -21,9 +21,9 @@
     </distributionManagement>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
-        <maven.compiler.release>25</maven.compiler.release>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <keycloak.version>26.5.3</keycloak.version>
     </properties>
@@ -73,16 +73,11 @@
 
     <build>
         <plugins>
-            <!-- Compiler plugin: enforce Java 25 -->
+            <!-- Compiler plugin: version pinned; source/target/release come from properties above -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-                <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                    <release>25</release>
-                </configuration>
             </plugin>
 
             <!-- Shade plugin: produce a single fat JAR with no provided deps bundled.
