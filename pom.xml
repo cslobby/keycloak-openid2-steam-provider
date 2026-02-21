@@ -80,6 +80,24 @@
                 <version>3.13.0</version>
             </plugin>
 
+            <!-- Jandex plugin: generate META-INF/jandex.idx so that Keycloak's Quarkus
+                 build step (kc.sh build) can scan our JAX-RS annotations at build time.
+                 Without this index, RESTEasy Reactive cannot discover the @GET method on
+                 the inner Endpoint class and routing to it silently fails. -->
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>3.2.2</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals>
+                            <goal>jandex</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Shade plugin: produce a single fat JAR with no provided deps bundled.
                  Because every dependency above is <scope>provided</scope> and Keycloak's
                  runtime already supplies them, the resulting JAR is essentially just the
