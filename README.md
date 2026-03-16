@@ -8,10 +8,10 @@ where Keycloak confirms each assertion server-side by posting back to Steam.
 
 ## Building
 
-Requirements: JDK 25+, Maven 3.9+.
+Requirements: JDK 21+, Maven 3.9+.
 
 ```bash
-mvn package -DskipTests
+mvn package
 ```
 
 The resulting fat JAR is at:
@@ -20,34 +20,44 @@ The resulting fat JAR is at:
 target/keycloak-openid2-steam-provider-1.0.0.jar
 ```
 
-Because every dependency is `<scope>provided</scope>`, the JAR contains only the compiled
-provider classes and the `META-INF/services` descriptor — nothing from the Keycloak runtime
-itself is bundled.
+Every dependency is `<scope>provided</scope>`, so the JAR contains only the compiled provider
+classes, the `META-INF/services` descriptor, and a Jandex index (`META-INF/jandex.idx`).
+Nothing from the Keycloak runtime is bundled.
 
 ---
 
 ## Deployment
 
-### Standalone Keycloak
+> **Important:** After placing the JAR you must run `kc.sh build` to trigger Quarkus
+> augmentation. Without this step Keycloak will not dispatch requests to the callback
+> endpoint and authentication will fail with an internal server error.
 
-Copy the JAR into the `providers/` directory and restart:
+### Standalone Keycloak
 
 ```bash
 cp target/keycloak-openid2-steam-provider-1.0.0.jar /opt/keycloak/providers/
-/opt/keycloak/bin/kc.sh build   # re-build augmented distribution
+/opt/keycloak/bin/kc.sh build
 /opt/keycloak/bin/kc.sh start
 ```
 
 ### Docker / Kubernetes
 
-Mount the JAR at `/opt/keycloak/providers/` before the `kc.sh start` command runs:
+Include the JAR in your custom image and run `kc.sh build` as part of the image build:
 
 ```dockerfile
+FROM quay.io/keycloak/keycloak:26.5.3
+
 COPY target/keycloak-openid2-steam-provider-1.0.0.jar /opt/keycloak/providers/
+
+RUN /opt/keycloak/bin/kc.sh build
+
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+CMD ["start"]
 ```
 
-Or with a Docker volume / Kubernetes ConfigMap. The Keycloak container will pick it up on
-next startup (or after `kc.sh build`).
+Running `kc.sh build` at image-build time (rather than at pod startup) is the recommended
+pattern for production Kubernetes deployments — the optimised distribution is baked into
+the image and pods start faster.
 
 ---
 
@@ -115,6 +125,23 @@ The `steamid64` attribute can be exposed as a JWT claim via a **User Attribute M
 
 ## Keycloak Version Compatibility
 
-Built against **Keycloak 26.5.x** (`keycloak-server-spi-private` 26.5.3).
+Built against **Keycloak 26.5.x** (`keycloak-services` 26.5.3).
 If you are running a different patch version, update `<keycloak.version>` in `pom.xml` and
 rebuild — no source changes should be needed as long as you stay within the 26.x line.
+
+---
+
+## Technical Notes
+
+### Why `AbstractOAuth2IdentityProvider` instead of `AbstractIdentityProvider`?
+
+Keycloak 26.x runs on Quarkus with RESTEasy Reactive. Sub-resource types for the
+`/broker/{provider}/endpoint` path are registered at **`kc.sh build` time** via Jandex
+scanning. Only types present in Keycloak's own distribution JARs are registered — custom
+endpoint classes in extension JARs are not discovered, causing dispatch to silently fail
+with HTTP 500.
+
+The fix is to extend `AbstractOAuth2IdentityProvider.Endpoint` (from `keycloak-services`),
+which IS registered at build time. Our `SteamEndpoint` inherits that registration and
+Quarkus can dispatch to it correctly. The `@GET authResponse()` method is overridden to
+implement Steam's OpenID 2.0 verification instead of the standard OAuth2 code exchange.
