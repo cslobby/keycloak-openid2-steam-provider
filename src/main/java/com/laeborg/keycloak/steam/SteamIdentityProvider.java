@@ -61,8 +61,6 @@ public class SteamIdentityProvider
         extends AbstractOAuth2IdentityProvider<SteamIdentityProviderConfig>
         implements SocialIdentityProvider<SteamIdentityProviderConfig> {
 
-    private static final Logger LOG = Logger.getLogger(SteamIdentityProvider.class);
-
     static final String STEAM_OPENID_URL = "https://steamcommunity.com/openid/login";
     static final String OPENID_NS        = "http://specs.openid.net/auth/2.0";
     static final String OPENID_ID_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
@@ -107,7 +105,6 @@ public class SteamIdentityProvider
                 + "&openid.identity="   + penc(OPENID_ID_SELECT)
                 + "&openid.claimed_id=" + penc(OPENID_ID_SELECT);
 
-        LOG.debugf("Redirecting to Steam OpenID: %s", steamUrl);
         return Response.seeOther(URI.create(steamUrl)).build();
     }
 
@@ -119,7 +116,6 @@ public class SteamIdentityProvider
     public Object callback(RealmModel realm,
                            UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                            EventBuilder event) {
-        LOG.debug("SteamIdentityProvider.callback() called — returning SteamEndpoint");
         return new SteamEndpoint(callback, realm, event, this);
     }
 
@@ -210,9 +206,6 @@ public class SteamIdentityProvider
             String signed           = params.getFirst("openid.signed");
             String sig              = params.getFirst("openid.sig");
 
-            LOG.debugf("SteamEndpoint.authResponse() called: state=%s mode=%s claimedId=%s",
-                    state, mode, claimedId);
-
             // --- Guard: state must be present ----------------------------------
             if (state == null || state.isBlank()) {
                 LOG.warn("Steam callback received without a state parameter");
@@ -291,7 +284,6 @@ public class SteamIdentityProvider
             }
 
             federatedIdentity.setUsername(username);
-            LOG.debugf("Steam authentication successful: steamid64=%s username=%s", steamId, username);
             return callback.authenticated(federatedIdentity);
         }
 
@@ -331,8 +323,6 @@ public class SteamIdentityProvider
 
             HttpResponse<String> resp = HTTP_CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
             String responseBody = resp.body();
-            LOG.debugf("Steam check_authentication response (status=%d): %s", resp.statusCode(), responseBody);
-
             return responseBody != null && responseBody.contains("is_valid:true");
         }
 
