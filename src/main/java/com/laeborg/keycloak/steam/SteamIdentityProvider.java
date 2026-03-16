@@ -19,6 +19,7 @@ import org.keycloak.events.EventBuilder;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.io.IOException;
@@ -117,6 +118,22 @@ public class SteamIdentityProvider
                            UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                            EventBuilder event) {
         return new SteamEndpoint(callback, realm, event, this);
+    }
+
+    // -------------------------------------------------------------------------
+    // updateBrokeredUser — persist custom attributes on first login and on sync
+    // -------------------------------------------------------------------------
+
+    @Override
+    public void updateBrokeredUser(KeycloakSession session, RealmModel realm,
+                                   UserModel user, BrokeredIdentityContext context) {
+        super.updateBrokeredUser(session, realm, user, context);
+
+        String steamId = (String) context.getContextData().get("user.attribute.steamid64");
+        if (steamId != null) user.setSingleAttribute("steamid64", steamId);
+
+        String picture = (String) context.getContextData().get("user.attribute.picture");
+        if (picture != null) user.setSingleAttribute("picture", picture);
     }
 
     // -------------------------------------------------------------------------
