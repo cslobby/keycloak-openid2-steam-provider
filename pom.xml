@@ -54,6 +54,17 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Keycloak services: AbstractOAuth2IdentityProvider, OAuth2IdentityProviderConfig.
+             Required so SteamIdentityProvider can extend AbstractOAuth2IdentityProvider and
+             SteamEndpoint can extend AbstractOAuth2IdentityProvider.Endpoint — the one sub-resource
+             type that Quarkus/RESTEasy Reactive has registered at kc.sh build time. -->
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-services</artifactId>
+            <version>${keycloak.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Jakarta RESTful Web Services (JAX-RS) annotations used in the endpoint -->
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
