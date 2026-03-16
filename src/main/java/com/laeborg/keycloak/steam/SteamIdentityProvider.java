@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.Response;
 
 import org.jboss.logging.Logger;
@@ -28,6 +27,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -65,6 +65,11 @@ public class SteamIdentityProvider
 
     /** Shared ObjectMapper for parsing Steam API JSON responses. */
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** Shared HTTP client for all outbound calls (verify + profile fetch). */
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     public SteamIdentityProvider(KeycloakSession session, SteamIdentityProviderConfig config) {
         super(session, config);
@@ -135,17 +140,14 @@ public class SteamIdentityProvider
      * {@code IdentityBrokerService} routes GET requests to
      * {@code /realms/{realm}/broker/steam/endpoint} here.
      *
-     * <p>Intentionally a non-static inner class so that RESTEasy can inject
-     * {@code @Context} fields and properly register it as a sub-resource.</p>
+     * <p>Intentionally a non-static inner class so that it can access
+     * {@code SteamIdentityProvider.this} members (session, config, etc.) directly.</p>
      */
     protected class Endpoint {
 
         protected final UserAuthenticationIdentityProvider.AuthenticationCallback callback;
         protected final RealmModel realm;
         protected final EventBuilder event;
-
-        @Context
-        protected KeycloakSession session;
 
         public Endpoint(UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                         RealmModel realm,
@@ -225,6 +227,10 @@ public class SteamIdentityProvider
                 LOG.warnf("Invalid or expired Keycloak state in Steam callback: %s", state);
                 return callback.error(getConfig(), "Invalid or expired authentication session");
             }
+            if (authSession == null) {
+                LOG.warnf("getAndVerifyAuthenticationSession returned null for state: %s", state);
+                return callback.error(getConfig(), "Invalid or expired authentication session");
+            }
             session.getContext().setAuthenticationSession(authSession);
 
             // --- Step 4: build the brokered identity ---------------------------
@@ -294,14 +300,13 @@ public class SteamIdentityProvider
                     ? body.substring(0, body.length() - 1)
                     : body.toString();
 
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(STEAM_OPENID_URL))
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(formBody))
                     .build();
 
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp = HTTP_CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
             String responseBody = resp.body();
             LOG.debugf("Steam check_authentication response (status=%d): %s", resp.statusCode(), responseBody);
 
@@ -341,13 +346,12 @@ public class SteamIdentityProvider
                     + "?key="      + URLEncoder.encode(apiKey,   StandardCharsets.UTF_8)
                     + "&steamids=" + URLEncoder.encode(steamId, StandardCharsets.UTF_8);
 
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .GET()
                     .build();
 
-            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp = HTTP_CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() != 200) {
                 LOG.warnf("Steam Web API returned HTTP %d for steamid64=%s", resp.statusCode(), steamId);
                 return null;
