@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 
 import org.jboss.logging.Logger;
@@ -69,23 +69,28 @@ public class SteamCallbackEndpoint {
     /**
      * Handles the GET callback from Steam after the user authenticates.
      *
-     * <p>Steam appends all {@code openid.*} parameters to the {@code openid.return_to}
-     * URL it received, so they arrive here as query parameters alongside our {@code state}.</p>
+     * <p>Query parameters are read directly from the Keycloak session URI context rather
+     * than via {@code @QueryParam} injection. This makes the method invokable regardless
+     * of whether the JAX-RS injection machinery is available for extension provider
+     * sub-resources (it is not reliably available in Keycloak 26.x Quarkus deployments).</p>
      */
     @GET
-    public Response authResponse(
-            @QueryParam("state")                    String state,
-            @QueryParam("openid.mode")              String mode,
-            @QueryParam("openid.ns")                String ns,
-            @QueryParam("openid.op_endpoint")       String opEndpoint,
-            @QueryParam("openid.claimed_id")        String claimedId,
-            @QueryParam("openid.identity")          String identity,
-            @QueryParam("openid.return_to")         String returnTo,
-            @QueryParam("openid.response_nonce")    String responseNonce,
-            @QueryParam("openid.invalidate_handle") String invalidateHandle,
-            @QueryParam("openid.assoc_handle")      String assocHandle,
-            @QueryParam("openid.signed")            String signed,
-            @QueryParam("openid.sig")               String sig) {
+    public Response authResponse() {
+        MultivaluedMap<String, String> params =
+                provider.getSession().getContext().getUri().getQueryParameters();
+
+        String state              = params.getFirst("state");
+        String mode               = params.getFirst("openid.mode");
+        String ns                 = params.getFirst("openid.ns");
+        String opEndpoint         = params.getFirst("openid.op_endpoint");
+        String claimedId          = params.getFirst("openid.claimed_id");
+        String identity           = params.getFirst("openid.identity");
+        String returnTo           = params.getFirst("openid.return_to");
+        String responseNonce      = params.getFirst("openid.response_nonce");
+        String invalidateHandle   = params.getFirst("openid.invalidate_handle");
+        String assocHandle        = params.getFirst("openid.assoc_handle");
+        String signed             = params.getFirst("openid.signed");
+        String sig                = params.getFirst("openid.sig");
 
         LOG.debugf("SteamCallbackEndpoint.authResponse() called: state=%s mode=%s claimedId=%s",
                 state, mode, claimedId);
