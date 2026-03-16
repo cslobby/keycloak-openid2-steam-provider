@@ -119,7 +119,7 @@ public class SteamIdentityProvider
                            UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                            EventBuilder event) {
         LOG.debug("SteamIdentityProvider.callback() called — returning Endpoint");
-        return new Endpoint(callback, realm, event);
+        return new Endpoint(this, callback, realm, event);
     }
 
     // -------------------------------------------------------------------------
@@ -140,18 +140,22 @@ public class SteamIdentityProvider
      * {@code IdentityBrokerService} routes GET requests to
      * {@code /realms/{realm}/broker/steam/endpoint} here.
      *
-     * <p>Intentionally a non-static inner class so that it can access
-     * {@code SteamIdentityProvider.this} members (session, config, etc.) directly.</p>
+     * <p>Must be a <em>static</em> nested class — RESTEasy Reactive registers
+     * sub-resource methods at Quarkus build time via bytecode scanning and
+     * does not support non-static inner classes as sub-resources.</p>
      */
-    protected class Endpoint {
+    protected static class Endpoint {
 
+        protected final SteamIdentityProvider provider;
         protected final UserAuthenticationIdentityProvider.AuthenticationCallback callback;
         protected final RealmModel realm;
         protected final EventBuilder event;
 
-        public Endpoint(UserAuthenticationIdentityProvider.AuthenticationCallback callback,
+        public Endpoint(SteamIdentityProvider provider,
+                        UserAuthenticationIdentityProvider.AuthenticationCallback callback,
                         RealmModel realm,
                         EventBuilder event) {
+            this.provider = provider;
             this.callback = callback;
             this.realm    = realm;
             this.event    = event;
@@ -184,16 +188,16 @@ public class SteamIdentityProvider
             // --- Guard: state must be present ----------------------------------
             if (state == null || state.isBlank()) {
                 LOG.warn("Steam callback received without a state parameter");
-                return callback.error(getConfig(), "Missing state parameter in Steam callback");
+                return callback.error(provider.getConfig(), "Missing state parameter in Steam callback");
             }
 
             // --- Guard: Steam must have approved (mode == id_res) --------------
             if (!"id_res".equals(mode)) {
                 LOG.warnf("Steam returned unexpected openid.mode: %s", mode);
                 if ("cancel".equals(mode)) {
-                    return callback.cancelled(getConfig());
+                    return callback.cancelled(provider.getConfig());
                 }
-                return callback.error(getConfig(),
+                return callback.error(provider.getConfig(),
                         "Steam authentication was not approved (openid.mode=" + mode + ")");
             }
 
@@ -203,7 +207,7 @@ public class SteamIdentityProvider
                         returnTo, responseNonce, invalidateHandle, assocHandle, signed, sig);
                 if (!valid) {
                     LOG.warn("Steam check_authentication returned is_valid:false");
-                    return callback.error(getConfig(),
+                    return callback.error(provider.getConfig(),
                             "Steam check_authentication returned is_valid:false — the assertion could not be verified");
                 }
             } catch (Exception e) {
@@ -215,7 +219,7 @@ public class SteamIdentityProvider
             String steamId = extractSteamId(claimedId);
             if (steamId == null) {
                 LOG.errorf("Could not extract steamid64 from claimed_id: %s", claimedId);
-                return callback.error(getConfig(),
+                return callback.error(provider.getConfig(),
                         "Invalid Steam claimed_id — could not extract steamid64");
             }
 
@@ -225,25 +229,25 @@ public class SteamIdentityProvider
                 authSession = callback.getAndVerifyAuthenticationSession(state);
             } catch (Exception e) {
                 LOG.warnf("Invalid or expired Keycloak state in Steam callback: %s", state);
-                return callback.error(getConfig(), "Invalid or expired authentication session");
+                return callback.error(provider.getConfig(), "Invalid or expired authentication session");
             }
             if (authSession == null) {
                 LOG.warnf("getAndVerifyAuthenticationSession returned null for state: %s", state);
-                return callback.error(getConfig(), "Invalid or expired authentication session");
+                return callback.error(provider.getConfig(), "Invalid or expired authentication session");
             }
-            session.getContext().setAuthenticationSession(authSession);
+            provider.session.getContext().setAuthenticationSession(authSession);
 
             // --- Step 4: build the brokered identity ---------------------------
             BrokeredIdentityContext federatedIdentity =
-                    new BrokeredIdentityContext(steamId, getConfig());
-            federatedIdentity.setIdp(SteamIdentityProvider.this);
+                    new BrokeredIdentityContext(steamId, provider.getConfig());
+            federatedIdentity.setIdp(provider);
             federatedIdentity.setAuthenticationSession(authSession);
             federatedIdentity.setUserAttribute("steamid64", steamId);
 
             // Use steamid64 as the Keycloak username by default; override with
             // the Steam display name when an API key is configured.
             String username = steamId;
-            String apiKey = getConfig().getSteamApiKey();
+            String apiKey = provider.getConfig().getSteamApiKey();
             if (apiKey != null && !apiKey.isBlank()) {
                 try {
                     SteamProfile profile = fetchSteamProfile(steamId, apiKey);
