@@ -143,7 +143,7 @@ public class SteamIdentityProvider
                 context.getId(), context.getUsername(), context.getContextData().keySet());
 
         String steamId = context.getId();
-        if (steamId != null) user.setSingleAttribute("steamid64", steamId);
+        if (steamId != null) user.setSingleAttribute("steam_id", steamId);
 
         String personaName = context.getUsername();
         if (personaName != null) user.setSingleAttribute("steam_username", personaName);
