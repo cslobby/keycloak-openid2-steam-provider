@@ -125,15 +125,31 @@ public class SteamIdentityProvider
     // -------------------------------------------------------------------------
 
     @Override
+    public void importNewUser(KeycloakSession session, RealmModel realm,
+                              UserModel user, BrokeredIdentityContext context) {
+        super.importNewUser(session, realm, user, context);
+        applySteamAttributes(user, context);
+    }
+
+    @Override
     public void updateBrokeredUser(KeycloakSession session, RealmModel realm,
                                    UserModel user, BrokeredIdentityContext context) {
         super.updateBrokeredUser(session, realm, user, context);
+        applySteamAttributes(user, context);
+    }
 
-        String steamId = (String) context.getContextData().get("user.attribute.steamid64");
+    private void applySteamAttributes(UserModel user, BrokeredIdentityContext context) {
+        logger.infof("applySteamAttributes: steamId=%s, username=%s, contextDataKeys=%s",
+                context.getId(), context.getUsername(), context.getContextData().keySet());
+
+        String steamId = context.getId();
         if (steamId != null) user.setSingleAttribute("steamid64", steamId);
 
-        String picture = (String) context.getContextData().get("user.attribute.picture");
-        if (picture != null) user.setSingleAttribute("picture", picture);
+        String personaName = context.getUsername();
+        if (personaName != null) user.setSingleAttribute("steam_username", personaName);
+
+        String avatar = (String) context.getContextData().get("user.attribute.picture");
+        if (avatar != null) user.setSingleAttribute("steam_avatar", avatar);
     }
 
     // -------------------------------------------------------------------------
